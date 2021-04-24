@@ -1,28 +1,60 @@
 [bits 16]
 [org 0x7c00]
 
-mov ax, 0
-mov ss, ax
-mov ds, ax
-mov es, ax
+; set interrupt flag
+sti
 
-mov si, welcome_msg
-call print_string
+; get a20 line status
+mov ax, 0x2402
+int 0x1
 
-jmp $
+; goto start if activated
+cmp al, 1
+jz _start
 
-print_string:
-    mov ah, 0eh
-.next_char:
-    lodsb
-    cmp al, 0
-    je .done
-    int 10h
-    jmp .next_char
-.done:
-    ret
+; enable a20 line
+mov ax, 0x2401
+int 0x15
 
-welcome_msg db 'Hello World', 0
+_start:
+	cli ; clear interrupt flag
+
+	; setup segment registers
+	mov ax, 0
+	mov ss, ax ; stack segment
+	mov ds, ax ; data segment
+	mov es, ax ; extra segment
+
+	lgdt [gdt] ; setup global descriptor table
+	; prepare protected mode
+	mov eax, cr0
+	or eax, 1
+	mov cr0, eax
+	jmp far_jump
+
+
+
+[bits 32]
+far_jump:
+	; segment registers need to be reloaded after setting gdt up
+	mov ax, 0
+	mov ss, ax ; stack segment
+	mov ds, ax ; data segment
+	mov es, ax ; extra segment
+
+
+	jmp $
+
+[bits 16]
+; global descriptor table
+gdt:
+	dw gdt_end - gdt_start - 1
+	dd gdt_start
+
+gdt_start:
+gdt_null:
+	dq 0
+gdt_end:
 
 times 510-($-$$) db 0x00
 dw 0xAA55
