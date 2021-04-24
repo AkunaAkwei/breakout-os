@@ -1,0 +1,10 @@
+builddir = build
+
+rule as
+    command = nasm -f bin -o $out $in
+
+rule qemu
+    command = qemu-system-x86_64 -drive format=raw,file=$in
+
+build boot.bin: as src/boot.asm
+build run: qemu boot.bin
