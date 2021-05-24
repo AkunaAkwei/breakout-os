@@ -7,22 +7,34 @@ _start:
 
 	; setup segment registers
 	; do i need to do this? after lgdt maybe?
-	; mov ax, 0
-	; mov ss, ax ; stack segment
-	; mov ds, ax ; data segment
-	; mov es, ax ; extra segment
+	mov ax, 0
+	mov ss, ax ; stack segment
+	mov ds, ax ; data segment
+	mov es, ax ; extra segment
 
 	; place stack pointer somewhere
 	; mov sp, [_end]
 
 	; read kernel into memory
-	; TODO
-
 	mov dl, [drive_number]
+.driver_reset:
+	mov ah, 0x00
+	int 0x13
+	jc .driver_reset
+
+.driver_read:
+	mov ah, 0x02 ; parameter for interrupt 13: read
+	mov al, 10 ; read 10 sectors
+	mov cl, 2 ; after sector 2
+	mov bx, 0x8000 ; safe at 0x800
+
+	mov ch, 0x00
+	mov dh, 0x00
+	int 0x13
+	jc .driver_read
 
 	; activate a20 line
-	sti ; set interrupt flag
-
+.a20:
 	; get a20 line status
 	mov ax, 0x2402
 	int 0x15
@@ -48,9 +60,8 @@ _start:
 	mov ss, ax ; stack segment
 	mov ds, ax ; data segment
 	mov es, ax ; extra segment
-	mov esp, 0x3000
 
-	jmp kernel_jump ; jump into kernel
+	jmp 0x08:kernel_jump ; jump into kernel
 
 [bits 32]
 ; because of 32 bit mode we can access eax
@@ -60,9 +71,12 @@ kernel_jump:
 	or eax, 1    ; set it to one
 	mov cr0, eax ; move it back
 
+	; move stackpointer somewhere
+	mov esp, 0x9000
+
 	; jump into kernel at 0x1000
-	mov eax, 0x1000
-	; jmp [eax]
+	; mov eax, 0x1000
+	jmp 0x0000:0x8000
 	jmp $
 
 [bits 16]
@@ -87,7 +101,7 @@ gdt_code:
     ;        f   ; if executable bit (d) = 0, whether write access is allowed, read is always allowed
                  ; is executable bit (d) = 1, whether read access is allowed, write is never allowed
     ;         g  ; set to 0
-	db 10010010b ; access byte
+	db 10011010b ; access byte
 	;  a         ; granularity bit. set 0 for 1 byte blocks (byte granularity), set 1 for 4 KiB blocks (page granularity)
 	;   b        ; size bit. set 0 for 16 bit protected mode, set 1 for 32 bit protected mode
 	;    cc      ; reserved (for 64 bit mode)
